@@ -14,7 +14,7 @@ from mmdet.datasets.pipelines import Compose
 from mmdet.models import build_detector
 
 
-def init_detector(config, checkpoint=None, device='cuda:0', cfg_options=None):
+def init_detector(config, checkpoint=None, device='cuda:0', cfg_options=None, use_dropout=False):
     """Initialize a detector from config file.
 
     Args:
@@ -50,7 +50,16 @@ def init_detector(config, checkpoint=None, device='cuda:0', cfg_options=None):
     model.cfg = config  # save the config in the model for convenience
     model.to(device)
     model.eval()
+    if use_dropout:
+        enable_dropout(model)
     return model
+
+
+def enable_dropout(model):
+    """ Function to enable the dropout layers during inference time """
+    for m in model.modules():
+        if m.__class__.__name__.startswith('Dropout'):
+            m.train()
 
 
 class LoadImage:
