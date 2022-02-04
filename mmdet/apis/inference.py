@@ -14,7 +14,7 @@ from mmdet.datasets.pipelines import Compose
 from mmdet.models import build_detector
 
 
-def init_detector(config, checkpoint=None, device='cuda:0', cfg_options=None, use_dropout=False):
+def init_detector(config, checkpoint=None, device='cuda:0', cfg_options=None):
     """Initialize a detector from config file.
 
     Args:
@@ -50,7 +50,7 @@ def init_detector(config, checkpoint=None, device='cuda:0', cfg_options=None, us
     model.cfg = config  # save the config in the model for convenience
     model.to(device)
     model.eval()
-    if use_dropout:
+    if config.model.test_cfg.get('enable_dropout', False):
         enable_dropout(model)
     return model
 
