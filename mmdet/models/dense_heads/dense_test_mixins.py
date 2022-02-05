@@ -14,14 +14,14 @@ if sys.version_info >= (3, 7):
 class BBoxTestMixin(object):
     """Mixin class for testing det bboxes via DenseHead."""
 
-    def simple_test_bboxes(self, feats, img_metas, rescale=False):
+    def simple_test_bboxes(self, feats, img_metas, rescale=False, **kwargs):
         """Test det bboxes without test-time augmentation, can be applied in
         DenseHead except for ``RPNHead`` and its variants, e.g., ``GARPNHead``,
         etc.
 
         Args:
-            feats (tuple[torch.Tensor]): Multi-level features from the
-                upstream network, each is a 4D-tensor.
+            feats (tuple[torch.Tensor] or tuple[tuple[torch.Tensor]] for MC dropout): 
+                Multi-level features from the upstream network, each is a 4D-tensor.
             img_metas (list[dict]): List of image information.
             rescale (bool, optional): Whether to rescale the results.
                 Defaults to False.
@@ -33,9 +33,15 @@ class BBoxTestMixin(object):
                 The shape of the second tensor in the tuple is ``labels``
                 with shape (n,)
         """
-        outs = self.forward(feats)
+        if kwargs['do_MC_dropout']:
+            outs = []
+            for f in feats:
+                outs.append( self.forward(f)[0] )
+            outs = tuple(outs)
+        else:
+            outs = self.forward(feats)[0]
         results_list = self.get_bboxes(
-            *outs, img_metas=img_metas, rescale=rescale)
+            outs, img_metas=img_metas, rescale=rescale, **kwargs)
         return results_list
 
     def aug_test_bboxes(self, feats, img_metas, rescale=False):

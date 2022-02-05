@@ -90,7 +90,7 @@ class DetectionBlock(BaseModule):
 
 @NECKS.register_module()
 class YOLOV3BayesianNeck(BaseModule):
-    """The neck of YOLOV3, made bayesian.
+    """The neck of YOLOV3, made bayesian with addition od dropout layers after convolutional layers.
 
     It can be treated as a simplified version of FPN. It
     will take the result from Darknet backbone and do some upsampling and

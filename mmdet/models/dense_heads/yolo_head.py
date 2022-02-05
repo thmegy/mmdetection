@@ -210,12 +210,14 @@ class YOLOV3Head(BaseDenseHead, BBoxTestMixin):
                    img_metas,
                    cfg=None,
                    rescale=False,
-                   with_nms=True):
+                   with_nms=True,
+                   **kwargs):
         """Transform network output for a batch into bbox predictions. It has
         been accelerated since PR #5991.
 
         Args:
-            pred_maps (list[Tensor]): Raw predictions for a batch of images.
+            pred_maps (tuple[Tensor] or tuple[tuple[Tensor]] for MC dropout):
+                Raw predictions for a batch of images.
             img_metas (list[dict]): Meta information of each image, e.g.,
                 image size, scaling factor, etc.
             cfg (mmcv.Config | None): Test / postprocessing configuration,
@@ -233,35 +235,74 @@ class YOLOV3Head(BaseDenseHead, BBoxTestMixin):
                 each element represents the class label of the corresponding
                 box.
         """
-        assert len(pred_maps) == self.num_levels
-        cfg = self.test_cfg if cfg is None else cfg
         scale_factors = [img_meta['scale_factor'] for img_meta in img_metas]
-
         num_imgs = len(img_metas)
-        featmap_sizes = [pred_map.shape[-2:] for pred_map in pred_maps]
+        cfg = self.test_cfg if cfg is None else cfg
 
-        mlvl_anchors = self.prior_generator.grid_priors(
-            featmap_sizes, device=pred_maps[0].device)
-        flatten_preds = []
-        flatten_strides = []
-        for pred, stride in zip(pred_maps, self.featmap_strides):
-            pred = pred.permute(0, 2, 3, 1).reshape(num_imgs, -1,
-                                                    self.num_attrib)
-            pred[..., :2].sigmoid_()
-            flatten_preds.append(pred)
-            flatten_strides.append(
-                pred.new_tensor(stride).expand(pred.size(1)))
+        if kwargs['do_MC_dropout']:
+            assert len(pred_maps[0]) == self.num_levels
+            featmap_sizes = [pred_map.shape[-2:] for pred_map in pred_maps[0]]
+            mlvl_anchors = self.prior_generator.grid_priors(
+                featmap_sizes, device=pred_maps[0][0].device)
 
-        flatten_preds = torch.cat(flatten_preds, dim=1)
-        flatten_bbox_preds = flatten_preds[..., :4]
-        flatten_objectness = flatten_preds[..., 4].sigmoid()
-        flatten_cls_scores = flatten_preds[..., 5:].sigmoid()
+            flatten_bbox_preds_list = []
+            flatten_objectness_list = []
+            flatten_cls_scores_list = []
+            for pm in pred_maps:
+                flatten_preds = []
+                flatten_strides = []
+                for pred, stride in zip(pm, self.featmap_strides):
+                    pred = pred.permute(0, 2, 3, 1).reshape(num_imgs, -1,
+                                                            self.num_attrib)
+                    pred[..., :2].sigmoid_()
+                    flatten_preds.append(pred)
+                    flatten_strides.append(
+                        pred.new_tensor(stride).expand(pred.size(1)))
+
+                flatten_preds = torch.cat(flatten_preds, dim=1)
+                flatten_bbox_preds_list.append( flatten_preds[..., :4] )
+                flatten_objectness_list.append( flatten_preds[..., 4].sigmoid() )
+                flatten_cls_scores_list.append( flatten_preds[..., 5:].sigmoid() )
+
+            # stack predictions for each MC-dropout sample
+            flatten_bbox_preds = torch.stack(flatten_bbox_preds_list)
+            flatten_objectness = torch.stack(flatten_objectness_list)
+            flatten_cls_scores = torch.stack(flatten_cls_scores_list)
+
+            # Get mean over MC-dropout samples to get central value of prediction
+            flatten_bbox_preds = flatten_bbox_preds.mean(dim=0)
+            flatten_objectness = flatten_objectness.mean(dim=0)
+            flatten_cls_scores = flatten_cls_scores.mean(dim=0)
+            
+        else:
+            assert len(pred_maps) == self.num_levels
+            featmap_sizes = [pred_map.shape[-2:] for pred_map in pred_maps]
+
+            mlvl_anchors = self.prior_generator.grid_priors(
+                featmap_sizes, device=pred_maps[0].device)
+
+            flatten_preds = []
+            flatten_strides = []
+            for pred, stride in zip(pred_maps, self.featmap_strides):
+                pred = pred.permute(0, 2, 3, 1).reshape(num_imgs, -1,
+                                                        self.num_attrib)
+                pred[..., :2].sigmoid_()
+                flatten_preds.append(pred)
+                flatten_strides.append(
+                    pred.new_tensor(stride).expand(pred.size(1)))
+
+            flatten_preds = torch.cat(flatten_preds, dim=1)
+            flatten_bbox_preds = flatten_preds[..., :4]
+            flatten_objectness = flatten_preds[..., 4].sigmoid()
+            flatten_cls_scores = flatten_preds[..., 5:].sigmoid()
+            
         flatten_anchors = torch.cat(mlvl_anchors)
         flatten_strides = torch.cat(flatten_strides)
         flatten_bboxes = self.bbox_coder.decode(flatten_anchors,
                                                 flatten_bbox_preds,
                                                 flatten_strides.unsqueeze(-1))
 
+        
         if with_nms and (flatten_objectness.size(0) == 0):
             return torch.zeros((0, 5)), torch.zeros((0, ))
 

@@ -153,7 +153,10 @@ def inference_detector(model, imgs):
 
     # forward the model
     with torch.no_grad():
-        results = model(return_loss=False, rescale=True, **data)
+        do_MC_dropout = cfg.model.test_cfg.get('enable_dropout', False)
+        n_samples = cfg.model.test_cfg.get('n_MC_samples', 20)
+
+        results = model(return_loss=False, rescale=True, do_MC_dropout=do_MC_dropout, n_sample=n_samples, **data)
 
     if not is_batch:
         return results[0]
