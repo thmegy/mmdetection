@@ -13,6 +13,8 @@ from mmcv.runner import get_dist_info
 
 from mmdet.core import encode_mask_results
 
+from .inference import enable_dropout
+
 
 def single_gpu_test(config,
                     model,
