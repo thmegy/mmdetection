@@ -213,7 +213,7 @@ def main():
 
     if not distributed:
         model = MMDataParallel(model, device_ids=cfg.gpu_ids)
-        outputs = single_gpu_test(model, data_loader, args.show, args.show_dir,
+        outputs = single_gpu_test(cfg, model, data_loader, args.show, args.show_dir,
                                   args.show_score_thr)
     else:
         model = MMDistributedDataParallel(

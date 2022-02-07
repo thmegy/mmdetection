@@ -14,18 +14,24 @@ from mmcv.runner import get_dist_info
 from mmdet.core import encode_mask_results
 
 
-def single_gpu_test(model,
+def single_gpu_test(config,
+                    model,
                     data_loader,
                     show=False,
                     out_dir=None,
                     show_score_thr=0.3):
     model.eval()
+    if config.model.test_cfg.get('enable_dropout', False):
+        enable_dropout(model)
     results = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            result = model(return_loss=False, rescale=True, **data)
+            do_MC_dropout = config.model.test_cfg.get('enable_dropout', False)
+            n_samples = config.model.test_cfg.get('n_MC_samples', 20)
+
+            result = model(return_loss=False, rescale=True, do_MC_dropout=do_MC_dropout, n_sample=n_samples, **data)
 
         batch_size = len(result)
         if show or out_dir:
