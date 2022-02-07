@@ -33,7 +33,7 @@ class BBoxTestMixin(object):
                 The shape of the second tensor in the tuple is ``labels``
                 with shape (n,)
         """
-        if kwargs['do_MC_dropout']:
+        if 'do_MC_dropout' in kwargs and kwargs['do_MC_dropout']:
             outs = []
             for f in feats:
                 outs.append( self.forward(f)[0] )

@@ -98,7 +98,7 @@ class SingleStageDetector(BaseDetector):
                 The outer list corresponds to each image. The inner list
                 corresponds to each class.
         """
-        if kwargs['do_MC_dropout']:
+        if 'do_MC_dropout' in kwargs and kwargs['do_MC_dropout']:
             feat = []
             for _ in range( kwargs['n_sample'] ):
                 feat.append( self.extract_feat(img) )

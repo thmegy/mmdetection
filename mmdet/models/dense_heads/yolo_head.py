@@ -239,7 +239,7 @@ class YOLOV3Head(BaseDenseHead, BBoxTestMixin):
         num_imgs = len(img_metas)
         cfg = self.test_cfg if cfg is None else cfg
 
-        if kwargs['do_MC_dropout']:
+        if 'do_MC_dropout' in kwargs and kwargs['do_MC_dropout']:
             assert len(pred_maps[0]) == self.num_levels
             featmap_sizes = [pred_map.shape[-2:] for pred_map in pred_maps[0]]
             mlvl_anchors = self.prior_generator.grid_priors(
