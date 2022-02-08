@@ -16,23 +16,21 @@ from mmdet.core import encode_mask_results
 from .inference import enable_dropout
 
 
-def single_gpu_test(config,
-                    model,
+def single_gpu_test(model,
                     data_loader,
                     show=False,
                     out_dir=None,
-                    show_score_thr=0.3):
+                    show_score_thr=0.3,
+                    do_MC_dropout=False,
+                    n_samples=20):
     model.eval()
-    if config.model.test_cfg.get('enable_dropout', False):
+    if do_MC_dropout:
         enable_dropout(model)
     results = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            do_MC_dropout = config.model.test_cfg.get('enable_dropout', False)
-            n_samples = config.model.test_cfg.get('n_MC_samples', 20)
-
             result = model(return_loss=False, rescale=True, do_MC_dropout=do_MC_dropout, n_sample=n_samples, **data)
 
         batch_size = len(result)
