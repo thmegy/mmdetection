@@ -19,9 +19,9 @@ def get_method(method, tensor):
     
     if method == 'MarginSampling':
         return margin_sampling(tensor)
-    else if method == 'Entropy':
+    elif method == 'Entropy':
         return entropy(tensor)
-    else if method == 'VarRatio':
+    elif method == 'VarRatio':
         return var_ratio(tensor)
 
 
