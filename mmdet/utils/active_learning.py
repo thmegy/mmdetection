@@ -1,9 +1,9 @@
 import torch
 
 
-def get_method(method, tensor):
+def estimate_uncertainty(method, tensor):
     '''
-    Select method to estimate uncertainty on the classification task for a set of predicted bounding boxes
+    Estimate classification uncertainty for a set of predicted bounding boxes.
 
     Arguments:
     
@@ -48,3 +48,29 @@ def var_ratio(tensor):
     Measure uncertainty as 1 - probability of highest-ranking class
     '''
     return 1 - tensor.max(dim=2)[0]
+
+
+
+def aggregate_uncertainty(method, tensor, weight=None):
+    '''
+    Aggregate uncertainties for individual bounding boxes into an overall uncertainty for an image.
+
+    Arguments:
+    
+    method (str): name of method used to aggregate the uncertainty
+    tensor (torch.tensor): output of estimate_uncertainty, dimension ( N(images), N(bbox) )
+    weight (torch.tensor): weights to apply element-wise in aggregation, e.g. weight classification uncertainty by objectness uncertainty in YOLOv3
+
+    Returns:
+
+    torch.tensor with dimension ( N(images) )
+    '''
+    if weight is not None:
+        tensor = tensor * weight
+    
+    if method == 'maximum':
+        return tensor.max(dim=1)
+    elif method == 'average':
+        return tensor.mean(dim=1)
+    elif method == 'sum':
+        return tensor.sum(dim=1)
