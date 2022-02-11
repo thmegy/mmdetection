@@ -16,6 +16,7 @@ from mmdet.core import (build_assigner, build_bbox_coder,
 from ..builder import HEADS, build_loss
 from .base_dense_head import BaseDenseHead
 from .dense_test_mixins import BBoxTestMixin
+from mmdet.utils import estimate_uncertainty, aggregate_uncertainty
 
 
 @HEADS.register_module()
@@ -295,6 +296,13 @@ class YOLOV3Head(BaseDenseHead, BBoxTestMixin):
             flatten_bbox_preds = flatten_preds[..., :4]
             flatten_objectness = flatten_preds[..., 4].sigmoid()
             flatten_cls_scores = flatten_preds[..., 5:].sigmoid()
+
+            if 'active_learning' in kwargs and kwargs['active_learning']:
+                flatten_objectness_unc = estimate_uncertainty(cfg.active_learning.score_method, flatten_objectness)
+                flatten_cls_scores_unc = estimate_uncertainty(cfg.active_learning.score_method, flatten_cls_scores)
+
+                uncertainty = aggregate_uncertainty(cfg.active_learning.aggregation_method, flatten_cls_scores_unc, weight=flatten_objectness_unc)
+
             
         flatten_anchors = torch.cat(mlvl_anchors)
         flatten_strides = torch.cat(flatten_strides)
