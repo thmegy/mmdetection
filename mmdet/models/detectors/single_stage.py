@@ -105,14 +105,19 @@ class SingleStageDetector(BaseDetector):
             feat = tuple(feat)
         else:
             feat = self.extract_feat(img)
-            
-        results_list = self.bbox_head.simple_test(
-            feat, img_metas, rescale=rescale, **kwargs)
-        bbox_results = [
-            bbox2result(det_bboxes, det_labels, self.bbox_head.num_classes)
-            for det_bboxes, det_labels in results_list
-        ]
-        return bbox_results
+
+        if 'active_learning' in kwargs and kwargs['active_learning']:
+            results = self.bbox_head.simple_test(
+                feat, img_metas, rescale=rescale, **kwargs)
+            return results
+        else:
+            results_list = self.bbox_head.simple_test(
+                feat, img_metas, rescale=rescale, **kwargs)
+            bbox_results = [
+                bbox2result(det_bboxes, det_labels, self.bbox_head.num_classes)
+                for det_bboxes, det_labels in results_list
+            ]
+            return bbox_results
 
     def aug_test(self, imgs, img_metas, rescale=False):
         """Test function with test time augmentation.

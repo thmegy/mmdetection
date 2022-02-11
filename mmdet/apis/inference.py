@@ -95,7 +95,7 @@ class LoadImage:
         return results
 
 
-def inference_detector(model, imgs):
+def inference_detector(model, imgs, active_learning=False):
     """Inference image(s) with the detector.
 
     Args:
@@ -156,12 +156,15 @@ def inference_detector(model, imgs):
         do_MC_dropout = cfg.model.test_cfg.get('enable_dropout', False)
         n_samples = cfg.model.test_cfg.get('n_MC_samples', 20)
 
-        results = model(return_loss=False, rescale=True, do_MC_dropout=do_MC_dropout, n_sample=n_samples, **data)
+        results = model(return_loss=False, rescale=True, do_MC_dropout=do_MC_dropout, n_sample=n_samples, active_learning=active_learning, **data)
 
-    if not is_batch:
-        return results[0]
-    else:
+    if active_learning: # return raw detector output
         return results
+    else:
+        if not is_batch:
+            return results[0]
+        else:
+            return results
 
 
 async def async_inference_detector(model, imgs):
