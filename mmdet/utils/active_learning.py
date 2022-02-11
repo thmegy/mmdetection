@@ -74,3 +74,59 @@ def aggregate_uncertainty(method, tensor, weight=None):
         return tensor.mean(dim=1)
     elif method == 'sum':
         return tensor.sum(dim=1)
+
+
+
+def select_images(method, tensor, n_sel, **kwargs):
+    '''
+    Select set of unlabelled images to be added to training set
+
+    Arguments:
+    
+    method (str): name of method used to select images
+    tensor (torch.tensor): output of aggregate_uncertainty, dimension ( N(images) )
+    n_sel (int): number of images to select
+
+    Returns:
+
+    torch.tensor with index of selected images, dimension ( n_sel )
+    '''
+
+    if method == 'batch':
+        return batch_selection(tensor, n_sel, **kwargs)
+    elif method == 'maximum':
+        return maximum_selection(tensor, n_sel)
+
+
+
+def batch_selection(tensor, n_sel, **kwargs):
+    '''
+    Split randomly shuffled images in batches, compute aggregate score (sum) for each batch and select highest scores until n_sel is reached.
+
+    Necessary keyword argument:
+
+    n_batch (int): number of images per batch
+    '''
+    if (n_sel % kwargs['n_batch']) == 0:
+        n_batch_sel = int(n_sel / kwargs['n_batch'])
+    else:
+        n_batch_sel = (n_sel // kwargs['n_batch']) + 1
+    
+    r = torch.randperm(tensor.shape[0])
+    tensor_shuffle = tensor[r] # randomly shuffle images
+
+    batch_list = tensor_shuffle.split(kwargs['n_batch'])
+    batch_score_tensor = torch.tensor( [ b.sum().item() for b in batch_list ] )
+    batch_argmax = batch_score_tensor.sort(descending=True)[1][:n_batch_sel]
+
+    arg_sel = torch.concat( [r.split(kwargs['n_batch'])[ib] for ib in range(len(batch_list)) if ib in batch_argmax] )
+
+    return arg_sel
+
+
+
+def maximum_selection(tensor, n_sel):
+    '''
+    Select the n_sel images with the highest uncertainty.
+    '''
+    return tensor.sort(descending=True)[:n_sel]
