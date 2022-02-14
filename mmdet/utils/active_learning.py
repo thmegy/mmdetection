@@ -15,7 +15,7 @@ def estimate_uncertainty(method, tensor):
     torch.tensor with dimension ( N(images), N(bbox) )
     '''
     if tensor.ndim == 2: # only one class, if binary classification
-        tensor = torch.concat( (tensor[:,:,None], 1 - a[:,:,None]), dim=2 ) # dimension ( N(images), N(bbox), 2 )
+        tensor = torch.concat( (tensor[:,:,None], 1 - tensor[:,:,None]), dim=2 ) # dimension ( N(images), N(bbox), 2 )
     
     if method == 'MarginSampling':
         return margin_sampling(tensor)
@@ -129,4 +129,4 @@ def maximum_selection(tensor, n_sel):
     '''
     Select the n_sel images with the highest uncertainty.
     '''
-    return tensor.sort(descending=True)[:n_sel]
+    return tensor.sort(descending=True)[1][:n_sel]

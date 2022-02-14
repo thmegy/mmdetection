@@ -16,7 +16,7 @@ from mmdet.core import (build_assigner, build_bbox_coder,
 from ..builder import HEADS, build_loss
 from .base_dense_head import BaseDenseHead
 from .dense_test_mixins import BBoxTestMixin
-from mmdet.utils import estimate_uncertainty, aggregate_uncertainty
+from mmdet.utils import estimate_uncertainty, aggregate_uncertainty, select_images
 
 
 @HEADS.register_module()
@@ -298,10 +298,17 @@ class YOLOV3Head(BaseDenseHead, BBoxTestMixin):
             flatten_cls_scores = flatten_preds[..., 5:].sigmoid()
 
             if 'active_learning' in kwargs and kwargs['active_learning']:
+                # compute uncertainty of individual bboxes
                 flatten_objectness_unc = estimate_uncertainty(cfg.active_learning.score_method, flatten_objectness)
                 flatten_cls_scores_unc = estimate_uncertainty(cfg.active_learning.score_method, flatten_cls_scores)
 
+                # compute overall uncertainty of images
                 uncertainty = aggregate_uncertainty(cfg.active_learning.aggregation_method, flatten_cls_scores_unc, weight=flatten_objectness_unc)
+
+                # select images to be added to the training set
+                selection = select_images(cfg.active_learning.selection_method, uncertainty, cfg.active_learning.n_sel, **cfg.active_learning.selection_kwargs)
+
+                return selection
 
             
         flatten_anchors = torch.cat(mlvl_anchors)
