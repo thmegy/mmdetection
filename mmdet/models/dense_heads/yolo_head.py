@@ -305,10 +305,7 @@ class YOLOV3Head(BaseDenseHead, BBoxTestMixin):
                 # compute overall uncertainty of images
                 uncertainty = aggregate_uncertainty(cfg.active_learning.aggregation_method, flatten_cls_scores_unc, weight=flatten_objectness_unc)
 
-                # select images to be added to the training set
-                selection = select_images(cfg.active_learning.selection_method, uncertainty, cfg.active_learning.n_sel, **cfg.active_learning.selection_kwargs)
-
-                return selection
+                return uncertainty
 
             
         flatten_anchors = torch.cat(mlvl_anchors)
