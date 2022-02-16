@@ -214,8 +214,8 @@ def main():
     if not distributed:
         model = MMDataParallel(model, device_ids=cfg.gpu_ids)
 
-        do_MC_dropout = config.model.test_cfg.get('enable_dropout', False)
-        n_samples = config.model.test_cfg.get('n_MC_samples', 20)
+        do_MC_dropout = cfg.model.test_cfg.get('enable_dropout', False)
+        n_samples = cfg.model.test_cfg.get('n_MC_samples', 20)
 
         outputs = single_gpu_test(model, data_loader, args.show, args.show_dir,
                                   args.show_score_thr, do_MC_dropout=do_MC_dropout, n_samples=n_samples)
