@@ -73,6 +73,8 @@ def parse_args():
         default='none',
         help='job launcher')
     parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument('--incremental-learning', action='store_true', help='Use sampler for incremental learning')
+
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -189,7 +191,8 @@ def main():
         distributed=distributed,
         validate=(not args.no_validate),
         timestamp=timestamp,
-        meta=meta)
+        meta=meta,
+        incremental_learning=args.incremental_learning)
 
 
 if __name__ == '__main__':

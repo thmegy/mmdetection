@@ -74,7 +74,8 @@ def train_detector(model,
                    distributed=False,
                    validate=False,
                    timestamp=None,
-                   meta=None):
+                   meta=None,
+                   incremental_learning=False):
     logger = get_root_logger(log_level=cfg.log_level)
 
     # prepare data loaders
@@ -95,6 +96,10 @@ def train_detector(model,
 
     runner_type = 'EpochBasedRunner' if 'runner' not in cfg else cfg.runner[
         'type']
+    
+    alpha = cfg.model.bbox_head.test_cfg.active_learning.get('alpha', 0.5) # for active learning
+    n_sel = cfg.model.bbox_head.test_cfg.active_learning.get('n_sel', 50)
+    
     data_loaders = [
         build_dataloader(
             ds,
@@ -105,7 +110,11 @@ def train_detector(model,
             dist=distributed,
             seed=cfg.seed,
             runner_type=runner_type,
-            persistent_workers=cfg.data.get('persistent_workers', False))
+            persistent_workers=cfg.data.get('persistent_workers', False),
+            incremental_learning = incremental_learning,
+            alpha=alpha,
+            n_sel=n_sel
+        )
         for ds in dataset
     ]
 

@@ -105,21 +105,21 @@ def batch_selection(tensor, n_sel, **kwargs):
 
     Necessary keyword argument:
 
-    n_batch (int): number of images per batch
+    batch_size (int): number of images per batch
     '''
-    if (n_sel % kwargs['n_batch']) == 0:
-        n_batch_sel = int(n_sel / kwargs['n_batch'])
+    if (n_sel % kwargs['batch_size']) == 0:
+        batch_size_sel = int(n_sel / kwargs['batch_size'])
     else:
-        n_batch_sel = (n_sel // kwargs['n_batch']) + 1
+        batch_size_sel = (n_sel // kwargs['batch_size']) + 1
     
     r = torch.randperm(tensor.shape[0])
     tensor_shuffle = tensor[r] # randomly shuffle images
 
-    batch_list = tensor_shuffle.split(kwargs['n_batch'])
+    batch_list = tensor_shuffle.split(kwargs['batch_size'])
     batch_score_tensor = torch.tensor( [ b.sum().item() for b in batch_list ] )
-    batch_argmax = batch_score_tensor.sort(descending=True)[1][:n_batch_sel]
+    batch_argmax = batch_score_tensor.sort(descending=True)[1][:batch_size_sel]
 
-    arg_sel = torch.concat( [r.split(kwargs['n_batch'])[ib] for ib in range(len(batch_list)) if ib in batch_argmax] )
+    arg_sel = torch.concat( [r.split(kwargs['batch_size'])[ib] for ib in range(len(batch_list)) if ib in batch_argmax] )
 
     return arg_sel
 

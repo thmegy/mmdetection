@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 
 from .samplers import (DistributedGroupSampler, DistributedSampler,
                        GroupSampler, InfiniteBatchSampler,
-                       InfiniteGroupBatchSampler)
+                       InfiniteGroupBatchSampler, InfiniteWeightedSampler)
 
 if platform.system() != 'Windows':
     # https://github.com/pytorch/pytorch/issues/973
@@ -138,17 +138,29 @@ def build_dataloader(dataset,
         # a mini-batch indices each time.
         # it can be used in both `DataParallel` and
         # `DistributedDataParallel`
-        if shuffle:
-            batch_sampler = InfiniteGroupBatchSampler(
-                dataset, batch_size, world_size, rank, seed=seed)
+        if 'incremental_learning' in kwargs and kwargs['incremental_learning']:
+            batch_sampler = InfiniteWeightedSampler(dataset,
+                                                    batch_size=batch_size,
+                                                    seed=seed,
+                                                    alpha=kwargs['alpha'],
+                                                    n_sel=kwargs['n_sel']
+            )
+            del kwargs['incremental_learning']
+            del kwargs['alpha']
+            del kwargs['n_sel']
         else:
-            batch_sampler = InfiniteBatchSampler(
-                dataset,
-                batch_size,
-                world_size,
-                rank,
-                seed=seed,
-                shuffle=False)
+            if shuffle:
+                batch_sampler = InfiniteGroupBatchSampler(
+                    dataset, batch_size, world_size, rank, seed=seed)
+            else:
+                batch_sampler = InfiniteBatchSampler(
+                    dataset,
+                    batch_size,
+                    world_size,
+                    rank,
+                    seed=seed,
+                    shuffle=False
+                )
         batch_size = 1
         sampler = None
     else:

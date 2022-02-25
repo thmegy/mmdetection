@@ -170,3 +170,54 @@ class InfiniteBatchSampler(Sampler):
     def set_epoch(self, epoch):
         """Not supported in `IterationBased` runner."""
         raise NotImplementedError
+
+
+class InfiniteWeightedSampler(Sampler):
+    """
+    It is designed iteration-based runners like `IterBasedRunner` and
+    yields a mini-batch indices each time.
+    Specifically designed for incremental/online learning, for instance used in active learning.
+    New and old data are randomly selected according to probability alpha and 1-alpha, respectively.
+
+    Args:
+        dataset (object): The dataset.
+        batch_size (int): When model is :obj:`DistributedDataParallel`,
+            it is the number of training samples on each GPU,
+            When model is :obj:`DataParallel`, it is
+            `num_gpus * samples_per_gpu`.
+            Default : 1.
+        seed (int): Random seed. Default: 0.
+        n_sel (int): Size of new data
+        alpha (float): weight of old data
+    """
+
+    def __init__(self,
+                 dataset,
+                 batch_size=32,
+                 seed=0,
+                 alpha=0.5,
+                 n_sel=50):
+        self.alpha = alpha
+        self.n_sel = n_sel
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.seed = seed if seed is not None else 0
+        self.size = len(dataset)
+
+    def __iter__(self):
+#        g = torch.Generator()
+#        g.manual_seed(self.seed)
+        g = None
+        size_prev = self.size - self.n_sel # size of old data
+        weights = torch.concat( (torch.ones(size_prev) * self.alpha / size_prev,
+                               torch.ones(self.n_sel) * (1-self.alpha) / self.n_sel) )
+        while True:
+            yield torch.multinomial(weights, self.batch_size, generator=g).tolist()
+            
+    def __len__(self):
+        """Length of base dataset."""
+        return self.size
+
+    def set_epoch(self, epoch):
+        """Not supported in `IterationBased` runner."""
+        raise NotImplementedError
