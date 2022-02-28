@@ -69,7 +69,7 @@ def aggregate_uncertainty(method, tensor, weight=None):
         tensor = tensor * weight
     
     if method == 'maximum':
-        return tensor.max(dim=1)
+        return tensor.max(dim=1)[0]
     elif method == 'average':
         return tensor.mean(dim=1)
     elif method == 'sum':
