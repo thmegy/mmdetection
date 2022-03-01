@@ -110,7 +110,11 @@ class SingleStageDetector(BaseDetector):
             feat, img_metas, rescale=rescale, **kwargs)
         if 'active_learning' in kwargs and kwargs['active_learning']:
             if 'repr_selection' in kwargs and kwargs['repr_selection']:
-                return results_list, feat[0]
+                feat = feat[0].view(feat[0].shape[0], -1) # flatten feature map to get feature vector
+                # make feature vector of size 100 by linearly combining full feature vector
+                lin_mat = torch.ones([feat.shape[1], 100], device='cuda:0')
+                feat_vec = feat @ lin_mat
+                return results_list, feat_vec
             else:
                 return results_list
         else:

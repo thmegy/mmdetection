@@ -153,11 +153,11 @@ def core_set(tensor, n_sel, **kwargs):
     centroids[sel_idx] = True
     
     # select centroids (= data to be labelled) iteratively
-    for _ in range(len(n_sel-1)):
+    for _ in range(n_sel-1):
         d = dist_mat[~centroids][:,centroids] # remove centroids from row and keep only centroids for columns
         unc = tensor[~centroids] # get uncertainty of images other than centroids
         
-        mat_min = mat.min(dim=1)[0] # get closest centroid for each image
+        mat_min = d.min(dim=1)[0] # get closest centroid for each image
         weighted_mat_min = mat_min * unc # weight distance to closest centroid by uncertainty on image
         sel_idx_ = weighted_mat_min.argmax().item() # select image with largest distance to closest centroid
         sel_idx = torch.arange(tensor.shape[0])[~centroids][sel_idx_] # correct index for already selected images/rows
