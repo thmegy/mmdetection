@@ -96,6 +96,8 @@ def select_images(method, tensor, n_sel, **kwargs):
         return batch_selection(tensor, n_sel, **kwargs)
     elif method == 'maximum':
         return maximum_selection(tensor, n_sel)
+    elif method == 'CoreSet':
+        return core_set(tensor, n_sel, **kwargs)
 
 
 
@@ -130,3 +132,35 @@ def maximum_selection(tensor, n_sel):
     Select the n_sel images with the highest uncertainty.
     '''
     return tensor.sort(descending=True)[1][:n_sel]
+
+
+
+def core_set(tensor, n_sel, **kwargs):
+    '''
+    k-center greedy, limited to pool set and with distance weighted by uncertainty
+    '''
+    # compute matrix of distances between images
+    dist_mat = kwargs['embedding'] @ kwargs['embedding'].transpose(0, 1)
+    diag = dist_mat.diag().reshape( (kwargs['embedding'].shape[0], 1) )
+    dist_mat *= -2
+    dist_mat += diag
+    dist_mat += diag.transpose(0, 1)
+    dist_mat = torch.sqrt(dist_mat)
+
+    # choose first centroid randomly
+    centroids = torch.zeros(tensor.shape[0], dtype=torch.bool)
+    sel_idx = torch.randint( kwargs['embedding'].shape[0], (1,1) ).squeeze().item()
+    centroids[sel_idx] = True
+    
+    # select centroids (= data to be labelled) iteratively
+    for _ in range(len(n_sel-1)):
+        d = dist_mat[~centroids][:,centroids] # remove centroids from row and keep only centroids for columns
+        unc = tensor[~centroids] # get uncertainty of images other than centroids
+        
+        mat_min = mat.min(dim=1)[0] # get closest centroid for each image
+        weighted_mat_min = mat_min * unc # weight distance to closest centroid by uncertainty on image
+        sel_idx_ = weighted_mat_min.argmax().item() # select image with largest distance to closest centroid
+        sel_idx = torch.arange(tensor.shape[0])[~centroids][sel_idx_] # correct index for already selected images/rows
+        centroids[sel_idx] = True
+
+    return torch.arange(tensor.shape[0])[centroids]

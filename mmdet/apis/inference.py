@@ -95,7 +95,7 @@ class LoadImage:
         return results
 
 
-def inference_detector(model, imgs, active_learning=False):
+def inference_detector(model, imgs, active_learning=False, repr_selection=False):
     """Inference image(s) with the detector.
 
     Args:
@@ -156,7 +156,13 @@ def inference_detector(model, imgs, active_learning=False):
         do_MC_dropout = cfg.model.test_cfg.get('enable_dropout', False)
         n_samples = cfg.model.test_cfg.get('n_MC_samples', 20)
 
-        results = model(return_loss=False, rescale=True, do_MC_dropout=do_MC_dropout, n_sample=n_samples, active_learning=active_learning, **data)
+        results = model(return_loss=False,
+                        rescale=True,
+                        do_MC_dropout=do_MC_dropout,
+                        n_sample=n_samples,
+                        active_learning=active_learning,
+                        repr_selection=repr_selection,
+                        **data)
 
     if active_learning: # return raw detector output
         return results

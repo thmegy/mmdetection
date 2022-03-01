@@ -106,13 +106,14 @@ class SingleStageDetector(BaseDetector):
         else:
             feat = self.extract_feat(img)
 
+        results_list = self.bbox_head.simple_test(
+            feat, img_metas, rescale=rescale, **kwargs)
         if 'active_learning' in kwargs and kwargs['active_learning']:
-            results = self.bbox_head.simple_test(
-                feat, img_metas, rescale=rescale, **kwargs)
-            return results
+            if 'repr_selection' in kwargs and kwargs['repr_selection']:
+                return results_list, feat[0]
+            else:
+                return results_list
         else:
-            results_list = self.bbox_head.simple_test(
-                feat, img_metas, rescale=rescale, **kwargs)
             bbox_results = [
                 bbox2result(det_bboxes, det_labels, self.bbox_head.num_classes)
                 for det_bboxes, det_labels in results_list
