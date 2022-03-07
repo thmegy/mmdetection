@@ -145,9 +145,6 @@ def build_dataloader(dataset,
                                                     alpha=kwargs['alpha'],
                                                     n_sel=kwargs['n_sel']
             )
-            del kwargs['incremental_learning']
-            del kwargs['alpha']
-            del kwargs['n_sel']
         else:
             if shuffle:
                 batch_sampler = InfiniteGroupBatchSampler(
@@ -189,6 +186,13 @@ def build_dataloader(dataset,
         warnings.warn('persistent_workers is invalid because your pytorch '
                       'version is lower than 1.7.0')
 
+    if 'incremental_learning' in kwargs:
+        del kwargs['incremental_learning']
+    if 'alpha' in kwargs:
+        del kwargs['alpha']
+    if 'n_sel' in kwargs:
+        del kwargs['n_sel']
+        
     data_loader = DataLoader(
         dataset,
         batch_size=batch_size,

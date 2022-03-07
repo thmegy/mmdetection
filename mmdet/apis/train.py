@@ -96,9 +96,11 @@ def train_detector(model,
 
     runner_type = 'EpochBasedRunner' if 'runner' not in cfg else cfg.runner[
         'type']
-    
-    alpha = cfg.model.bbox_head.test_cfg.active_learning.get('alpha', 0.5) # for active learning
-    n_sel = cfg.model.bbox_head.test_cfg.active_learning.get('n_sel', 50)
+
+    al_kwargs = {}
+    if 'active_learning' in cfg.model.bbox_head.test_cfg:
+        al_kwargs['alpha'] = cfg.model.bbox_head.test_cfg.active_learning.get('alpha', 0.5) # for active learning
+        al_kwargs['n_sel'] = cfg.model.bbox_head.test_cfg.active_learning.get('n_sel', 50)
     
     data_loaders = [
         build_dataloader(
@@ -112,8 +114,7 @@ def train_detector(model,
             runner_type=runner_type,
             persistent_workers=cfg.data.get('persistent_workers', False),
             incremental_learning = incremental_learning,
-            alpha=alpha,
-            n_sel=n_sel
+            **al_kwargs
         )
         for ds in dataset
     ]
