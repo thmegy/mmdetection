@@ -24,14 +24,17 @@ def single_gpu_test(model,
                     do_MC_dropout=False,
                     n_samples=20):
     model.eval()
+    dropout_kwargs = {}
     if do_MC_dropout:
         enable_dropout(model)
+        dropout_kwargs['do_MC_dropout'] = do_MC_dropout
+        dropout_kwargs['n_samples'] = n_samples
     results = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            result = model(return_loss=False, rescale=True, do_MC_dropout=do_MC_dropout, n_sample=n_samples, **data)
+            result = model(return_loss=False, rescale=True, **dropout_kwargs, **data)
 
         batch_size = len(result)
         if show or out_dir:

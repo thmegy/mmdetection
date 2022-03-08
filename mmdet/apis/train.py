@@ -98,9 +98,11 @@ def train_detector(model,
         'type']
 
     al_kwargs = {}
-    if 'active_learning' in cfg.model.bbox_head.test_cfg:
-        al_kwargs['alpha'] = cfg.model.bbox_head.test_cfg.active_learning.get('alpha', 0.5) # for active learning
-        al_kwargs['n_sel'] = cfg.model.bbox_head.test_cfg.active_learning.get('n_sel', 50)
+    if 'bbox_head' in cfg.model:
+        if 'test_cfg' in cfg.model.bbox_head:
+            if 'active_learning' in cfg.model.bbox_head.test_cfg:
+                al_kwargs['alpha'] = cfg.model.bbox_head.test_cfg.active_learning.get('alpha', 0.5) # for active learning
+                al_kwargs['n_sel'] = cfg.model.bbox_head.test_cfg.active_learning.get('n_sel', 50)
     
     data_loaders = [
         build_dataloader(
