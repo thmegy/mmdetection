@@ -112,7 +112,7 @@ class SingleStageDetector(BaseDetector):
             if 'repr_selection' in kwargs and kwargs['repr_selection']:
                 feat = feat[0].view(feat[0].shape[0], -1) # flatten feature map to get feature vector
                 # make feature vector of size 100 by linearly combining full feature vector
-                lin_mat = torch.ones([feat.shape[1], 100], device='cuda:0')
+                lin_mat = torch.ones([feat.shape[1], 100], device=f'cuda:{torch.cuda.current_device()}')
                 feat_vec = feat @ lin_mat
                 return results_list, feat_vec
             else:
