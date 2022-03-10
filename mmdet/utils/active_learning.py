@@ -39,7 +39,7 @@ def entropy(tensor):
     Measure uncertainty as predictive entropy
     '''
     tensor_log = tensor.log()
-    return (tensor*tensor_log).sum(dim=2)
+    return -(tensor*tensor_log).sum(dim=2)
 
 
 
