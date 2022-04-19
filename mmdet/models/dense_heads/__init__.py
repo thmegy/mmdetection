@@ -35,6 +35,7 @@ from .tood_head import TOODHead
 from .vfnet_head import VFNetHead
 from .yolact_head import YOLACTHead, YOLACTProtonet, YOLACTSegmHead
 from .yolo_head import YOLOV3Head
+from .yolo_head_LPM import YOLOV3HeadLPM
 from .yolof_head import YOLOFHead
 from .yolox_head import YOLOXHead
 
@@ -44,7 +45,7 @@ __all__ = [
     'SSDHead', 'FCOSHead', 'RepPointsHead', 'FoveaHead',
     'FreeAnchorRetinaHead', 'ATSSHead', 'FSAFHead', 'NASFCOSHead',
     'PISARetinaHead', 'PISASSDHead', 'GFLHead', 'CornerHead', 'YOLACTHead',
-    'YOLACTSegmHead', 'YOLACTProtonet', 'YOLOV3Head', 'PAAHead',
+    'YOLACTSegmHead', 'YOLACTProtonet', 'YOLOV3Head', 'YOLOV3HeadLPM', 'PAAHead',
     'SABLRetinaHead', 'CentripetalHead', 'VFNetHead', 'StageCascadeRPNHead',
     'CascadeRPNHead', 'EmbeddingRPNHead', 'LDHead', 'CascadeRPNHead',
     'AutoAssignHead', 'DETRHead', 'YOLOFHead', 'DeformableDETRHead',

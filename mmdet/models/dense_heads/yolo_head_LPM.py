@@ -9,6 +9,7 @@ from mmdet.core import (build_assigner, build_bbox_coder,
                         build_prior_generator, build_sampler, images_to_levels,
                         multi_apply, multiclass_nms)
 from ..builder import HEADS, build_loss
+from .yolo_head import YOLOV3Head
 
 
 @HEADS.register_module()
@@ -76,7 +77,7 @@ class YOLOV3HeadLPM(YOLOV3Head):
                      override=dict(name='convs_pred')),
                  margin=1.,
                  weight=1.):
-        super(YOLOV3Head, self).__init__(num_classes, in_channels, out_channels,
+        super(YOLOV3HeadLPM, self).__init__(num_classes, in_channels, out_channels,
                                          anchor_generator, bbox_coder, featmap_strides,
                                          one_hot_smoother, conv_cfg, norm_cfg, act_cfg,
                                          loss_cls, loss_conf, loss_xy, loss_wh,
@@ -133,9 +134,10 @@ class YOLOV3HeadLPM(YOLOV3Head):
 
 
 
-    @force_fp32(apply_to=('pred_maps', ))
+    @force_fp32(apply_to=('pred_maps', 'loss_prediction'))
     def loss(self,
-             output,
+             pred_maps,
+             loss_prediction,
              gt_bboxes,
              gt_labels,
              img_metas,
@@ -143,8 +145,9 @@ class YOLOV3HeadLPM(YOLOV3Head):
         """Compute loss of the head.
 
         Args:
-            output (tuple[ list[Tensor], loss_prediction]): Prediction map for each scale level,
-                shape (N, num_anchors * num_attrib, H, W); loss prediction, shape (N)
+            pred_maps (list[Tensor]): Prediction map for each scale level,
+                shape (N, num_anchors * num_attrib, H, W)
+            loss_prediction (list[Tensor]): loss prediction, shape (N)
             gt_bboxes (list[Tensor]): Ground truth bboxes for each image with
                 shape (num_gts, 4) in [tl_x, tl_y, br_x, br_y] format.
             gt_labels (list[Tensor]): class indices corresponding to each box
@@ -158,10 +161,6 @@ class YOLOV3HeadLPM(YOLOV3Head):
         """
         num_imgs = len(img_metas)
         device = pred_maps[0][0].device
-
-        pred_maps = output[0]
-        loss_prediction = output[1]
-        
         featmap_sizes = [
             pred_maps[i].shape[-2:] for i in range(self.num_levels)
         ]
@@ -182,6 +181,12 @@ class YOLOV3HeadLPM(YOLOV3Head):
         losses_cls, losses_conf, losses_xy, losses_wh = multi_apply(
             self.loss_single, pred_maps, target_maps_list, neg_maps_list)
 
+        # compute losses per event: sum over bboxes, then sum over levels (small, medium, large)
+        losses_cls = sum([_loss.sum(dim=(1,2)) for _loss in losses_cls])
+        losses_conf = sum([_loss.sum(dim=-1) for _loss in losses_conf])
+        losses_xy = sum([_loss.sum(dim=(1,2)) for _loss in losses_xy])
+        losses_wh = sum([_loss.sum(dim=(1,2)) for _loss in losses_wh])
+
         # compute target loss --> sum
         loss_target = losses_cls + losses_conf + losses_xy + losses_wh
 
@@ -201,3 +206,5 @@ class YOLOV3HeadLPM(YOLOV3Head):
             loss_target=loss_target,
             loss_module=loss_module
         )
+
+
