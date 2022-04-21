@@ -133,7 +133,6 @@ class YOLOV3HeadLPM(YOLOV3Head):
 
 
 
-
     @force_fp32(apply_to=('pred_maps', 'loss_prediction'))
     def loss(self,
              pred_maps,
@@ -147,7 +146,7 @@ class YOLOV3HeadLPM(YOLOV3Head):
         Args:
             pred_maps (list[Tensor]): Prediction map for each scale level,
                 shape (N, num_anchors * num_attrib, H, W)
-            loss_prediction (list[Tensor]): loss prediction, shape (N)
+            loss_prediction (Tensor): loss prediction, shape (N)
             gt_bboxes (list[Tensor]): Ground truth bboxes for each image with
                 shape (num_gts, 4) in [tl_x, tl_y, br_x, br_y] format.
             gt_labels (list[Tensor]): class indices corresponding to each box
@@ -208,3 +207,105 @@ class YOLOV3HeadLPM(YOLOV3Head):
         )
 
 
+
+    @force_fp32(apply_to=('pred_maps', 'loss_prediction'))
+    def get_bboxes(self,
+                   pred_maps,
+                   loss_prediction,
+                   img_metas,
+                   cfg=None,
+                   rescale=False,
+                   with_nms=True,
+                   **kwargs):
+        """Transform network output for a batch into bbox predictions. It has
+        been accelerated since PR #5991.
+
+        Args:
+            pred_maps (tuple[Tensor]): Raw predictions for a batch of images.
+            loss_prediction (Tensor): Loss prediction for a batch of images.
+            img_metas (list[dict]): Meta information of each image, e.g.,
+                image size, scaling factor, etc.
+            cfg (mmcv.Config | None): Test / postprocessing configuration,
+                if None, test_cfg would be used. Default: None.
+            rescale (bool): If True, return boxes in original image space.
+                Default: False.
+            with_nms (bool): If True, do nms before return boxes.
+                Default: True.
+
+        Returns:
+            list[tuple[Tensor, Tensor]]: Each item in result_list is 2-tuple.
+                The first item is an (n, 5) tensor, where 5 represent
+                (tl_x, tl_y, br_x, br_y, score) and the score between 0 and 1.
+                The shape of the second tensor in the tuple is (n,), and
+                each element represents the class label of the corresponding
+                box.
+        """
+
+        if 'active_learning' in kwargs and kwargs['active_learning']:            
+            return loss_prediction
+
+        scale_factors = [img_meta['scale_factor'] for img_meta in img_metas]
+        num_imgs = len(img_metas)
+        cfg = self.test_cfg if cfg is None else cfg
+
+        assert len(pred_maps) == self.num_levels
+        featmap_sizes = [pred_map.shape[-2:] for pred_map in pred_maps]
+
+        mlvl_anchors = self.prior_generator.grid_priors(
+            featmap_sizes, device=pred_maps[0].device)
+
+        flatten_preds = []
+        flatten_strides = []
+        for pred, stride in zip(pred_maps, self.featmap_strides):
+            pred = pred.permute(0, 2, 3, 1).reshape(num_imgs, -1,
+                                                    self.num_attrib)
+            pred[..., :2].sigmoid_()
+            flatten_preds.append(pred)
+            flatten_strides.append(
+                pred.new_tensor(stride).expand(pred.size(1)))
+
+        flatten_preds = torch.cat(flatten_preds, dim=1)
+        flatten_bbox_preds = flatten_preds[..., :4]
+        flatten_objectness = flatten_preds[..., 4].sigmoid()
+        flatten_cls_scores = flatten_preds[..., 5:].sigmoid()
+            
+        flatten_anchors = torch.cat(mlvl_anchors)
+        flatten_strides = torch.cat(flatten_strides)
+        flatten_bboxes = self.bbox_coder.decode(flatten_anchors,
+                                                flatten_bbox_preds,
+                                                flatten_strides.unsqueeze(-1))
+
+        
+        if with_nms and (flatten_objectness.size(0) == 0):
+            return torch.zeros((0, 5)), torch.zeros((0, ))
+
+        if rescale:
+            flatten_bboxes /= flatten_bboxes.new_tensor(
+                scale_factors).unsqueeze(1)
+
+        padding = flatten_bboxes.new_zeros(num_imgs, flatten_bboxes.shape[1],
+                                           1)
+        flatten_cls_scores = torch.cat([flatten_cls_scores, padding], dim=-1)
+
+        det_results = []
+        for (bboxes, scores, objectness) in zip(flatten_bboxes,
+                                                flatten_cls_scores,
+                                                flatten_objectness):
+            # Filtering out all predictions with conf < conf_thr
+            conf_thr = cfg.get('conf_thr', -1)
+            if conf_thr > 0:
+                conf_inds = objectness >= conf_thr
+                bboxes = bboxes[conf_inds, :]
+                scores = scores[conf_inds, :]
+                objectness = objectness[conf_inds]
+
+            det_bboxes, det_labels = multiclass_nms(
+                bboxes,
+                scores,
+                cfg.score_thr,
+                cfg.nms,
+                cfg.max_per_img,
+                score_factors=objectness)
+            det_results.append(tuple([det_bboxes, det_labels]))
+        return det_results
+    

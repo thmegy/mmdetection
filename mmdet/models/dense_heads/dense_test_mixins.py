@@ -38,10 +38,10 @@ class BBoxTestMixin(object):
             for f in feats:
                 outs.append( self.forward(f)[0] )
             outs = tuple(outs)
+            results_list = self.get_bboxes(outs, img_metas=img_metas, rescale=rescale, **kwargs) # outs is a tuple in MC dropout case, we want it as single input
         else:
-            outs = self.forward(feats)[0]
-        results_list = self.get_bboxes(
-            outs, img_metas=img_metas, rescale=rescale, **kwargs)
+            outs = self.forward(feats)
+            results_list = self.get_bboxes(*outs, img_metas=img_metas, rescale=rescale, **kwargs)
         return results_list
 
     def aug_test_bboxes(self, feats, img_metas, rescale=False):
