@@ -53,7 +53,8 @@ class BBoxTestMixin:
                            img_metas,
                            proposals,
                            rcnn_test_cfg,
-                           rescale=False):
+                           rescale=False,
+                           **kwargs):
         """Test only det bboxes without augmentation.
 
         Args:
@@ -226,7 +227,8 @@ class MaskTestMixin:
                          img_metas,
                          det_bboxes,
                          det_labels,
-                         rescale=False):
+                         rescale=False,
+                         **kwargs):
         """Simple test for mask head without augmentation."""
         # image shapes of images in the batch
         ori_shapes = tuple(meta['ori_shape'] for meta in img_metas)

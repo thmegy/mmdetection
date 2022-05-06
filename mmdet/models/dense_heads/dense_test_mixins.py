@@ -44,7 +44,7 @@ class BBoxTestMixin(object):
             results_list = self.get_bboxes(*outs, img_metas=img_metas, rescale=rescale, **kwargs)
         return results_list
 
-    def aug_test_bboxes(self, feats, img_metas, rescale=False):
+    def aug_test_bboxes(self, feats, img_metas, rescale=False, **kwargs):
         """Test det bboxes with test time augmentation, can be applied in
         DenseHead except for ``RPNHead`` and its variants, e.g., ``GARPNHead``,
         etc.

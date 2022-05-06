@@ -67,7 +67,7 @@ class BaseSemanticHead(BaseModule, metaclass=ABCMeta):
         seg_preds = output['seg_preds']
         return self.loss(seg_preds, gt_semantic_seg)
 
-    def simple_test(self, x, img_metas, rescale=False):
+    def simple_test(self, x, img_metas, rescale=False, **kwargs):
         output = self.forward(x)
         seg_preds = output['seg_preds']
         seg_preds = F.interpolate(

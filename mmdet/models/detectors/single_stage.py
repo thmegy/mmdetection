@@ -124,7 +124,7 @@ class SingleStageDetector(BaseDetector):
             ]
             return bbox_results
 
-    def aug_test(self, imgs, img_metas, rescale=False):
+    def aug_test(self, imgs, img_metas, rescale=False, **kwargs):
         """Test function with test time augmentation.
 
         Args:

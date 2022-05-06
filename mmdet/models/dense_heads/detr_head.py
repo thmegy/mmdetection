@@ -682,7 +682,7 @@ class DETRHead(AnchorFreeHead):
 
         return det_bboxes, det_labels
 
-    def simple_test_bboxes(self, feats, img_metas, rescale=False):
+    def simple_test_bboxes(self, feats, img_metas, rescale=False, **kwargs):
         """Test det bboxes without test-time augmentation.
 
         Args:
