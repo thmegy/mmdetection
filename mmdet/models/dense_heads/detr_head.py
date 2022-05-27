@@ -12,6 +12,7 @@ from mmdet.core import (bbox_cxcywh_to_xyxy, bbox_xyxy_to_cxcywh,
 from mmdet.models.utils import build_transformer
 from ..builder import HEADS, build_loss
 from .anchor_free_head import AnchorFreeHead
+from mmdet.utils import estimate_uncertainty, aggregate_uncertainty, select_images
 
 
 @HEADS.register_module()
@@ -630,7 +631,8 @@ class DETRHead(AnchorFreeHead):
                            bbox_pred,
                            img_shape,
                            scale_factor,
-                           rescale=False):
+                           rescale=False,
+                           **kwargs):
         """Transform outputs from the last decoder layer into bbox predictions
         for each image.
 
@@ -661,6 +663,17 @@ class DETRHead(AnchorFreeHead):
         # exclude background
         if self.loss_cls.use_sigmoid:
             cls_score = cls_score.sigmoid()
+            
+            if 'active_learning' in kwargs and kwargs['active_learning']:
+                cls_score = cls_score[None, :, :] # add dimension to match shape expected by estimate_uncertainty()
+                # compute uncertainty of individual bboxes
+                cls_score_unc = estimate_uncertainty(self.test_cfg.active_learning.score_method, cls_score)
+
+                # compute overall uncertainty of images
+                uncertainty = aggregate_uncertainty(self.test_cfg.active_learning.aggregation_method, cls_score_unc)
+
+                return uncertainty
+
             scores, indexes = cls_score.view(-1).topk(max_per_img)
             det_labels = indexes % self.num_classes
             bbox_index = indexes // self.num_classes
@@ -701,7 +714,7 @@ class DETRHead(AnchorFreeHead):
         """
         # forward of this head requires img_metas
         outs = self.forward(feats, img_metas)
-        results_list = self.get_bboxes(*outs, img_metas, rescale=rescale)
+        results_list = self.get_bboxes(*outs, img_metas, rescale=rescale, **kwargs)
         return results_list
 
     def forward_onnx(self, feats, img_metas):

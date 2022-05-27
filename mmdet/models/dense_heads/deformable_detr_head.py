@@ -272,7 +272,8 @@ class DeformableDETRHead(DETRHead):
                    enc_cls_scores,
                    enc_bbox_preds,
                    img_metas,
-                   rescale=False):
+                   rescale=False,
+                   **kwargs):
         """Transform network outputs for a batch into bbox predictions.
 
         Args:
@@ -313,6 +314,9 @@ class DeformableDETRHead(DETRHead):
             scale_factor = img_metas[img_id]['scale_factor']
             proposals = self._get_bboxes_single(cls_score, bbox_pred,
                                                 img_shape, scale_factor,
-                                                rescale)
+                                                rescale, **kwargs)
             result_list.append(proposals)
-        return result_list
+        if 'active_learning' in kwargs and kwargs['active_learning']:
+            return torch.concat(result_list)
+        else:
+            return result_list

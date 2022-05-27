@@ -16,6 +16,8 @@ def estimate_uncertainty(method, tensor):
     '''
     if tensor.ndim == 2: # only one class, if binary classification
         tensor = torch.concat( (tensor[:,:,None], 1 - tensor[:,:,None]), dim=2 ) # dimension ( N(images), N(bbox), 2 )
+    elif tensor.shape[2] == 1: # case if dimension for classes already exists
+        tensor = torch.concat( (tensor, 1 - tensor), dim=2 ) # dimension ( N(images), N(bbox), 2 )
     
     if method == 'MarginSampling':
         return margin_sampling(tensor)
