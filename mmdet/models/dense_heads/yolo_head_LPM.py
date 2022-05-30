@@ -83,10 +83,13 @@ class YOLOV3HeadLPM(YOLOV3Head):
                                          loss_cls, loss_conf, loss_xy, loss_wh,
                                          train_cfg, test_cfg, init_cfg)
 
-        self.fc1 = nn.Linear(512, 128)
-        self.fc2 = nn.Linear(256, 128)
-        self.fc3 = nn.Linear(128, 128)
-        self.fc_out = nn.Linear(3*128, 1)
+        self.fc1_neck = nn.Linear(512, 128)
+        self.fc2_neck = nn.Linear(256, 128)
+        self.fc3_neck = nn.Linear(128, 128)
+        self.fc1_backbone = nn.Linear(256, 128)
+        self.fc2_backbone = nn.Linear(512, 128)
+        self.fc3_backbone = nn.Linear(1024, 128)
+        self.fc_out = nn.Linear(6*128, 1)
 
         # parameters for loss calculation
         self.margin = margin
@@ -98,35 +101,47 @@ class YOLOV3HeadLPM(YOLOV3Head):
         """Forward features from the upstream network.
 
         Args:
-            feats (tuple[Tensor]): Features from the upstream network, each is
-                a 4D-tensor.
+            feats (tuple(tuple[Tensor], tuple[Tensor])): Features from the upstream network, each is
+                a 4D-tensor. (Output of neck (N=3), output of backbone (N=3)).
 
         Returns:
             tuple[Tensor]: A tuple of multi-level predication map, each is a
                 4D-tensor of shape (batch_size, 5+num_classes, height, width).
+            Tensor: loss prediction for each batch image
         """
-
-        assert len(feats) == self.num_levels
+        feats_neck = feats[0]
+        feats_backbone = feats[1]
+        assert len(feats_neck) == self.num_levels
 
         # target module
         pred_maps = []
         for i in range(self.num_levels):
-            x = feats[i]
+            x = feats_neck[i]
             x = self.convs_bridge[i](x)
             pred_map = self.convs_pred[i](x)
             pred_maps.append(pred_map)
 
         # loss prediction module
-        out1 = feats[0].mean(dim=(-2,-1))
-        out1 = F.relu(self.fc1(out1))
+        out1_neck = feats_neck[0].mean(dim=(-2,-1))
+        out1_neck = F.relu(self.fc1_neck(out1_neck))
 
-        out2 = feats[1].mean(dim=(-2,-1))
-        out2 = F.relu(self.fc2(out2))
+        out2_neck = feats_neck[1].mean(dim=(-2,-1))
+        out2_neck = F.relu(self.fc2_neck(out2_neck))
 
-        out3 = feats[2].mean(dim=(-2,-1))
-        out3 = F.relu(self.fc3(out3))
+        out3_neck = feats_neck[2].mean(dim=(-2,-1))
+        out3_neck = F.relu(self.fc3_neck(out3_neck))
 
-        out = torch.cat((out1, out2, out3), dim=1)
+        out1_backbone = feats_backbone[0].mean(dim=(-2,-1))
+        out1_backbone = F.relu(self.fc1_backbone(out1_backbone))
+
+        out2_backbone = feats_backbone[1].mean(dim=(-2,-1))
+        out2_backbone = F.relu(self.fc2_backbone(out2_backbone))
+
+        out3_backbone = feats_backbone[2].mean(dim=(-2,-1))
+        out3_backbone = F.relu(self.fc3_backbone(out3_backbone))
+
+        out = torch.cat((out1_neck, out2_neck, out3_neck,
+                         out1_backbone, out2_backbone, out3_backbone), dim=1)
         out = self.fc_out(out).squeeze()
 
         return tuple(pred_maps), out

@@ -220,7 +220,8 @@ class YOLOXHead(BaseDenseHead, BBoxTestMixin):
                    img_metas=None,
                    cfg=None,
                    rescale=False,
-                   with_nms=True):
+                   with_nms=True,
+                   **kwargs):
         """Transform network outputs of a batch into bbox results.
         Args:
             cls_scores (list[Tensor]): Classification scores for all
