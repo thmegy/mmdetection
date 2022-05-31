@@ -8,6 +8,7 @@ from .centernet_head import CenterNetHead
 from .centripetal_head import CentripetalHead
 from .corner_head import CornerHead
 from .deformable_detr_head import DeformableDETRHead
+from .deformable_detr_head_LPM import DeformableDETRHeadLPM
 from .detr_head import DETRHead
 from .embedding_rpn_head import EmbeddingRPNHead
 from .fcos_head import FCOSHead
