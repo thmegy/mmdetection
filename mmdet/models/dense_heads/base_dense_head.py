@@ -104,7 +104,10 @@ class BaseDenseHead(BaseModule, metaclass=ABCMeta):
                                               img_meta, cfg, rescale, with_nms,
                                               **kwargs)
             result_list.append(results)
-        return result_list
+        if 'active_learning' in kwargs and kwargs['active_learning']:
+            return torch.concat(result_list)
+        else:
+            return result_list
 
     def _get_bboxes_single(self,
                            cls_score_list,

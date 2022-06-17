@@ -12,6 +12,7 @@ from mmdet.core.utils import filter_scores_and_topk
 from mmdet.models.utils import sigmoid_geometric_mean
 from ..builder import HEADS, build_loss
 from .atss_head import ATSSHead
+from mmdet.utils import estimate_uncertainty, aggregate_uncertainty, select_images
 
 
 class TaskDecomposition(nn.Module):
@@ -521,11 +522,9 @@ class TOODHead(ATSSHead):
                 self.prior_generator.strides):
 
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
-
             bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4) * stride[0]
             scores = cls_score.permute(1, 2,
                                        0).reshape(-1, self.cls_out_channels)
-
             # After https://github.com/open-mmlab/mmdetection/pull/6268/,
             # this operation keeps fewer bboxes under the same `nms_pre`.
             # There is no difference in performance for most models. If you
@@ -536,15 +535,27 @@ class TOODHead(ATSSHead):
                 dict(bbox_pred=bbox_pred, priors=priors))
             scores, labels, keep_idxs, filtered_results = results
 
-            bboxes = filtered_results['bbox_pred']
+            if 'active_learning' in kwargs and kwargs['active_learning']:
+                mlvl_scores.append(cls_score.permute(1, 2, 0).reshape(-1, self.cls_out_channels)[keep_idxs]) # keep scores only for pre-selected boxes
+            else:
+                bboxes = filtered_results['bbox_pred']
 
-            mlvl_bboxes.append(bboxes)
-            mlvl_scores.append(scores)
-            mlvl_labels.append(labels)
+                mlvl_bboxes.append(bboxes)
+                mlvl_scores.append(scores)
+                mlvl_labels.append(labels)
 
-        return self._bbox_post_process(mlvl_scores, mlvl_labels, mlvl_bboxes,
-                                       img_meta['scale_factor'], cfg, rescale,
-                                       with_nms, None, **kwargs)
+        if 'active_learning' in kwargs and kwargs['active_learning']:
+            mlvl_scores = torch.cat(mlvl_scores)
+            mlvl_scores = mlvl_scores[None, :, :] # add dimension to match shape expected by estimate_uncertainty()
+            # compute uncertainty of individual bboxes
+            mlvl_scores_unc = estimate_uncertainty(self.test_cfg.active_learning.score_method, mlvl_scores)
+            # compute overall uncertainty of images
+            uncertainty = aggregate_uncertainty(self.test_cfg.active_learning.aggregation_method, mlvl_scores_unc)
+            return uncertainty
+        else:
+            return self._bbox_post_process(mlvl_scores, mlvl_labels, mlvl_bboxes,
+                                           img_meta['scale_factor'], cfg, rescale,
+                                           with_nms, None, **kwargs)
 
     def get_targets(self,
                     cls_scores,
