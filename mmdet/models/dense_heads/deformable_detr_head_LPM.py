@@ -340,7 +340,7 @@ class DeformableDETRHeadLPM(DeformableDETRHead):
         try:
             loss_iou = loss_iou.reshape(num_imgs, -1)
         except:
-            losses_iou = torch.zeros(num_imgs)
+            loss_iou = torch.zeros(num_imgs)
 
         return loss_cls, loss_bbox, loss_iou, cls_avg_factor, num_total_pos
 
