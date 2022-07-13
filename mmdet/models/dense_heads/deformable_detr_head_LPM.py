@@ -402,7 +402,5 @@ class DeformableDETRHeadLPM(DeformableDETRHead):
                                                 img_shape, scale_factor,
                                                 rescale, **kwargs)
             result_list.append(proposals)
-        if 'active_learning' in kwargs and kwargs['active_learning']:
-            return torch.concat(result_list)
-        else:
-            return result_list
+
+        return result_list

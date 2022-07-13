@@ -7,7 +7,7 @@ from mmcv.runner import force_fp32
 
 from mmdet.core import (anchor_inside_flags, build_assigner, distance2bbox,
                         images_to_levels, multi_apply, reduce_mean, unmap)
-from mmdet.core.utils import filter_scores_and_topk
+from mmdet.core.utils import filter_scores_and_topk, select_single_mlvl
 from mmdet.models.utils import sigmoid_geometric_mean
 from ..builder import HEADS, build_loss
 from .atss_head import ATSSHead
@@ -206,9 +206,8 @@ class TOODHeadLPM(TOODHead):
             cls_score, targets, label_weights, avg_factor=1.0)
         # FG cat_id: [0, num_classes -1], BG cat_id: num_classes
         bg_class_ind = self.num_classes
-        pos_inds = ((labels >= 0)
-                    & (labels < bg_class_ind)).nonzero().squeeze(1)
-        
+        pos_inds = ((labels >= 0) & (labels < bg_class_ind)).nonzero().squeeze(1)
+            
         if len(pos_inds) > 0:
             pos_bbox_targets = bbox_targets[pos_inds]
             pos_bbox_pred = bbox_pred[pos_inds]
@@ -231,8 +230,13 @@ class TOODHeadLPM(TOODHead):
         else:
             loss_bbox = bbox_pred.sum() * 0
             pos_bbox_weight = bbox_targets.new_tensor(0.)
+            
         # reshape to have loss per image
-        loss_cls = loss_cls.reshape(num_imgs, -1, loss_cls.shape[-1]).sum(dim=(1,2))
+        try:
+            loss_cls = loss_cls.reshape(num_imgs, -1, loss_cls.shape[-1]).sum(dim=(1,2))
+        except:
+            loss_cls = torch.zeros(num_imgs).to(loss_cls.device)
+
         try:
             loss_bbox_img = []
             n_bbox = int(bbox_pred.shape[0]/num_imgs)
@@ -343,6 +347,91 @@ class TOODHeadLPM(TOODHead):
         loss_module = loss_module * self.weight
 
         return dict(
-            loss_target=loss_target,
+            loss_target=[torch.tensor(l, device=device) for l in loss_target.tolist()], # need to have list of tensors to compute sum instead of mean in _parse_losses()
             loss_module=loss_module
         )
+
+
+    @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'loss_prediction'))
+    def get_bboxes(self,
+                   cls_scores,
+                   bbox_preds,
+                   loss_prediction,
+                   score_factors=None,
+                   img_metas=None,
+                   cfg=None,
+                   rescale=False,
+                   with_nms=True,
+                   **kwargs):
+        """Transform network outputs of a batch into bbox results.
+
+        Note: When score_factors is not None, the cls_scores are
+        usually multiplied by it then obtain the real score used in NMS,
+        such as CenterNess in FCOS, IoU branch in ATSS.
+
+        Args:
+            cls_scores (list[Tensor]): Classification scores for all
+                scale levels, each is a 4D-tensor, has shape
+                (batch_size, num_priors * num_classes, H, W).
+            bbox_preds (list[Tensor]): Box energies / deltas for all
+                scale levels, each is a 4D-tensor, has shape
+                (batch_size, num_priors * 4, H, W).
+            score_factors (list[Tensor], Optional): Score factor for
+                all scale level, each is a 4D-tensor, has shape
+                (batch_size, num_priors * 1, H, W). Default None.
+            img_metas (list[dict], Optional): Image meta info. Default None.
+            cfg (mmcv.Config, Optional): Test / postprocessing configuration,
+                if None, test_cfg would be used.  Default None.
+            rescale (bool): If True, return boxes in original image space.
+                Default False.
+            with_nms (bool): If True, do nms before return boxes.
+                Default True.
+
+        Returns:
+            list[list[Tensor, Tensor]]: Each item in result_list is 2-tuple.
+                The first item is an (n, 5) tensor, where the first 4 columns
+                are bounding box positions (tl_x, tl_y, br_x, br_y) and the
+                5-th column is a score between 0 and 1. The second item is a
+                (n,) tensor where each item is the predicted class label of
+                the corresponding box.
+        """
+        if 'active_learning' in kwargs and kwargs['active_learning']:            
+            return loss_prediction
+
+        assert len(cls_scores) == len(bbox_preds)
+
+        if score_factors is None:
+            # e.g. Retina, FreeAnchor, Foveabox, etc.
+            with_score_factors = False
+        else:
+            # e.g. FCOS, PAA, ATSS, AutoAssign, etc.
+            with_score_factors = True
+            assert len(cls_scores) == len(score_factors)
+
+        num_levels = len(cls_scores)
+
+        featmap_sizes = [cls_scores[i].shape[-2:] for i in range(num_levels)]
+        mlvl_priors = self.prior_generator.grid_priors(
+            featmap_sizes,
+            dtype=cls_scores[0].dtype,
+            device=cls_scores[0].device)
+
+        result_list = []
+
+        for img_id in range(len(img_metas)):
+            img_meta = img_metas[img_id]
+            cls_score_list = select_single_mlvl(cls_scores, img_id)
+            bbox_pred_list = select_single_mlvl(bbox_preds, img_id)
+            if with_score_factors:
+                score_factor_list = select_single_mlvl(score_factors, img_id)
+            else:
+                score_factor_list = [None for _ in range(num_levels)]
+
+            results = self._get_bboxes_single(cls_score_list, bbox_pred_list,
+                                              score_factor_list, mlvl_priors,
+                                              img_meta, cfg, rescale, with_nms,
+                                              **kwargs)
+            result_list.append(results)
+
+        return result_list
+    
