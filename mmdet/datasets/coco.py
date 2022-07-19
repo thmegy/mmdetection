@@ -549,7 +549,7 @@ class CocoDataset(CustomDataset):
                         # area range index 0: all area ranges
                         # max dets index -1: typically 100 per image
                         nm = self.coco.loadCats(catId)[0]
-                        precision = precisions[:, :, idx, 0, -1]
+                        precision = precisions[0, :, idx, 0, -1]
                         precision = precision[precision > -1]
                         if precision.size:
                             ap = np.mean(precision)
@@ -594,7 +594,7 @@ class CocoDataset(CustomDataset):
                  metric='bbox',
                  logger=None,
                  jsonfile_prefix=None,
-                 classwise=False,
+                 classwise=True,
                  proposal_nums=(100, 300, 1000),
                  iou_thrs=None,
                  metric_items=None):
