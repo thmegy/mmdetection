@@ -156,10 +156,10 @@ class TOODHeadLPM(TOODHead):
 
         out5 = feats[4].mean(dim=(-2,-1))
         out5 = F.relu(self.fc5(out5))
-
+        
         out = torch.cat((out1, out2, out3, out4, out5), dim=1)
         out = self.fc_out(out).squeeze()
-
+        
         return tuple(cls_scores), tuple(bbox_preds), out
 
 
@@ -201,7 +201,6 @@ class TOODHeadLPM(TOODHead):
             labels, alignment_metrics)
         cls_loss_func = self.initial_loss_cls \
             if self.epoch < self.initial_epoch else self.loss_cls
-
         loss_cls = cls_loss_func(
             cls_score, targets, label_weights, avg_factor=1.0)
         # FG cat_id: [0, num_classes -1], BG cat_id: num_classes
@@ -235,7 +234,7 @@ class TOODHeadLPM(TOODHead):
         try:
             loss_cls = loss_cls.reshape(num_imgs, -1, loss_cls.shape[-1]).sum(dim=(1,2))
         except:
-            loss_cls = torch.zeros(num_imgs).to(loss_cls.device)
+            loss_cls = loss_cls.reshape(num_imgs, -1).sum(dim=1)
 
         try:
             loss_bbox_img = []
@@ -347,9 +346,10 @@ class TOODHeadLPM(TOODHead):
         loss_module = loss_module * self.weight
 
         return dict(
-            loss_target=[torch.tensor(l, device=device) for l in loss_target.tolist()], # need to have list of tensors to compute sum instead of mean in _parse_losses()
+            loss_target=loss_target.sum(),
             loss_module=loss_module
         )
+
 
 
     @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'loss_prediction'))
