@@ -17,7 +17,8 @@ from mmdet.datasets import (build_dataloader, build_dataset,
                             replace_ImageToTensor)
 from mmdet.models import build_detector
 from mmdet.utils import (build_ddp, build_dp, compat_cfg, get_device,
-                         setup_multi_processes, update_data_root)
+                         replace_cfg_vals, setup_multi_processes,
+                         update_data_root)
 
 
 def parse_args():
@@ -134,6 +135,9 @@ def main():
 
     cfg = Config.fromfile(args.config)
 
+    # replace the ${key} with the value of cfg.key
+    cfg = replace_cfg_vals(cfg)
+
     # update data root according to MMDET_DATASETS
     update_data_root(cfg)
 
@@ -217,6 +221,8 @@ def main():
     cfg.model.train_cfg = None
     model = build_detector(cfg.model, test_cfg=cfg.get('test_cfg'))
     fp16_cfg = cfg.get('fp16', None)
+    if fp16_cfg is None and cfg.get('device', None) == 'npu':
+        fp16_cfg = dict(loss_scale='dynamic')
     if fp16_cfg is not None:
         wrap_fp16_model(model)
     checkpoint = load_checkpoint(model, args.checkpoint, map_location='cpu')
@@ -242,8 +248,16 @@ def main():
             cfg.device,
             device_ids=[int(os.environ['LOCAL_RANK'])],
             broadcast_buffers=False)
-        outputs = multi_gpu_test(model, data_loader, args.tmpdir,
-                                 args.gpu_collect)
+
+        # In multi_gpu_test, if tmpdir is None, some tesnors
+        # will init on cuda by default, and no device choice supported.
+        # Init a tmpdir to avoid error on npu here.
+        if cfg.device == 'npu' and args.tmpdir is None:
+            args.tmpdir = './npu_tmpdir'
+
+        outputs = multi_gpu_test(
+            model, data_loader, args.tmpdir, args.gpu_collect
+            or cfg.evaluation.get('gpu_collect', False))
 
     rank, _ = get_dist_info()
     if rank == 0:

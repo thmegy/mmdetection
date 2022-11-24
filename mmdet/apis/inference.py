@@ -56,6 +56,12 @@ def init_detector(config, checkpoint=None, device='cuda:0', cfg_options=None):
     model.eval()
     if config.model.test_cfg.get('enable_dropout', False):
         enable_dropout(model)
+
+    if device == 'npu':
+        from mmcv.device.npu import NPUDataParallel
+        model = NPUDataParallel(model)
+        model.cfg = config
+
     return model
 
 

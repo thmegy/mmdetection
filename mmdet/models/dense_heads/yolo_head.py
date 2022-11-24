@@ -3,6 +3,7 @@
 
 import warnings
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -236,7 +237,11 @@ class YOLOV3Head(BaseDenseHead, BBoxTestMixin):
                 each element represents the class label of the corresponding
                 box.
         """
-        scale_factors = [img_meta['scale_factor'] for img_meta in img_metas]
+        assert len(pred_maps) == self.num_levels
+        cfg = self.test_cfg if cfg is None else cfg
+        scale_factors = np.array(
+            [img_meta['scale_factor'] for img_meta in img_metas])
+
         num_imgs = len(img_metas)
         cfg = self.test_cfg if cfg is None else cfg
 
