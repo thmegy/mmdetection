@@ -140,17 +140,28 @@ def filter_scores_and_topk(scores, score_thr, topk, results=None):
                 The filtered results. The shape of each item is \
                 (num_bboxes_filtered, N).
     """
-    valid_mask = scores > score_thr
-    scores = scores[valid_mask]
-    valid_idxs = torch.nonzero(valid_mask)
-
-    num_topk = min(topk, valid_idxs.size(0))
-    # torch.sort is actually faster than .topk (at least on GPUs)
+#    valid_mask = scores > score_thr
+#    scores = scores[valid_mask]
+#    valid_idxs = torch.nonzero(valid_mask)
+#
+#    num_topk = min(topk, valid_idxs.size(0))
+#    # torch.sort is actually faster than .topk (at least on GPUs)
+#    scores, idxs = scores.sort(descending=True)
+#    scores = scores[:num_topk]
+#    topk_idxs = valid_idxs[idxs[:num_topk]]
+    #keep_idxs, labels = topk_idxs.unbind(dim=1)
+    
+    scores, labels = scores.max(dim=1)
     scores, idxs = scores.sort(descending=True)
+    valid_mask = scores > score_thr
+    valid_idxs = torch.nonzero(valid_mask)
+    
+    num_topk = min(topk, valid_idxs.size(0))
     scores = scores[:num_topk]
-    topk_idxs = valid_idxs[idxs[:num_topk]]
-    keep_idxs, labels = topk_idxs.unbind(dim=1)
-
+    labels = labels[idxs]
+    labels = labels[:num_topk]
+    keep_idxs = idxs[:num_topk]
+    
     filtered_results = None
     if results is not None:
         if isinstance(results, dict):
