@@ -169,7 +169,7 @@ class BaseDenseHead(BaseModule, metaclass=ABCMeta):
         cfg = self.test_cfg if cfg is None else cfg
         img_shape = img_meta['img_shape']
         nms_pre = cfg.get('nms_pre', -1)
-
+        
         mlvl_bboxes = []
         mlvl_scores = []
         mlvl_labels = []
@@ -197,6 +197,7 @@ class BaseDenseHead(BaseModule, metaclass=ABCMeta):
                 # BG cat_id: num_class
                 scores = cls_score.softmax(-1)[:, :-1]
 
+
             # After https://github.com/open-mmlab/mmdetection/pull/6268/,
             # this operation keeps fewer bboxes under the same `nms_pre`.
             # There is no difference in performance for most models. If you
@@ -209,22 +210,34 @@ class BaseDenseHead(BaseModule, metaclass=ABCMeta):
 
             bbox_pred = filtered_results['bbox_pred']
             priors = filtered_results['priors']
-
+            
             if with_score_factors:
                 score_factor = score_factor[keep_idxs]
 
-            bboxes = self.bbox_coder.decode(
+            if 'active_learning' in kwargs and kwargs['active_learning']:
+                mlvl_scores.append(cls_score[keep_idxs]) # keep scores only for pre-selected boxes
+            else:
+                bboxes = self.bbox_coder.decode(
                 priors, bbox_pred, max_shape=img_shape)
 
-            mlvl_bboxes.append(bboxes)
-            mlvl_scores.append(scores)
-            mlvl_labels.append(labels)
-            if with_score_factors:
-                mlvl_score_factors.append(score_factor)
+                mlvl_bboxes.append(bboxes)
+                mlvl_scores.append(scores)
+                mlvl_labels.append(labels)
+                if with_score_factors:
+                    mlvl_score_factors.append(score_factor)
 
-        return self._bbox_post_process(mlvl_scores, mlvl_labels, mlvl_bboxes,
-                                       img_meta['scale_factor'], cfg, rescale,
-                                       with_nms, mlvl_score_factors, **kwargs)
+        if 'active_learning' in kwargs and kwargs['active_learning']:
+            mlvl_scores = torch.cat(mlvl_scores)
+            mlvl_scores = mlvl_scores[None, :, :] # add dimension to match shape expected by estimate_uncertainty()
+            # compute uncertainty of individual bboxes
+            mlvl_scores_unc = estimate_uncertainty(self.test_cfg.active_learning.score_method, mlvl_scores)
+            # compute overall uncertainty of images
+            uncertainty = aggregate_uncertainty(self.test_cfg.active_learning.aggregation_method, mlvl_scores_unc)
+            return uncertainty
+        else:
+            return self._bbox_post_process(mlvl_scores, mlvl_labels, mlvl_bboxes,
+                                           img_meta['scale_factor'], cfg, rescale,
+                                           with_nms, mlvl_score_factors, **kwargs)
 
     def _bbox_post_process(self,
                            mlvl_scores,
