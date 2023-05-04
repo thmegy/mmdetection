@@ -7,6 +7,7 @@ from mmcv.ops import batched_nms
 from mmcv.runner import BaseModule, force_fp32
 
 from mmdet.core.utils import filter_scores_and_topk, select_single_mlvl
+from mmdet.utils import estimate_uncertainty, aggregate_uncertainty
 
 
 class BaseDenseHead(BaseModule, metaclass=ABCMeta):
@@ -215,7 +216,7 @@ class BaseDenseHead(BaseModule, metaclass=ABCMeta):
                 score_factor = score_factor[keep_idxs]
 
             if 'active_learning' in kwargs and kwargs['active_learning']:
-                mlvl_scores.append(cls_score[keep_idxs]) # keep scores only for pre-selected boxes
+                mlvl_scores.append(cls_score.sigmoid()[keep_idxs]) # keep scores only for pre-selected boxes
             else:
                 bboxes = self.bbox_coder.decode(
                 priors, bbox_pred, max_shape=img_shape)
